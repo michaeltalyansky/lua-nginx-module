@@ -43,8 +43,9 @@ static char *ngx_http_lua_lowat_check(ngx_conf_t *cf, void *post, void *data);
 static ngx_int_t ngx_http_lua_set_ssl(ngx_conf_t *cf,
     ngx_http_lua_loc_conf_t *llcf);
 #endif
-#if (NGX_HTTP_LUA_HAVE_MMAP_SBRK)
-/* we cannot use "static" for this function since it may lead to compiler warnings */
+#if (NGX_HTTP_LUA_HAVE_MMAP_SBRK) && (NGX_LINUX)
+/* we cannot use "static" for this function since it may lead to compiler
+ * warnings */
 void ngx_http_lua_limit_data_segment(void);
 #   if !(NGX_HTTP_LUA_HAVE_CONSTRUCTOR)
 static ngx_int_t ngx_http_lua_pre_config(ngx_conf_t *cf);
@@ -552,7 +553,9 @@ static ngx_command_t ngx_http_lua_cmds[] = {
 
 
 ngx_http_module_t ngx_http_lua_module_ctx = {
-#if (NGX_HTTP_LUA_HAVE_MMAP_SBRK) && !(NGX_HTTP_LUA_HAVE_CONSTRUCTOR)
+#if (NGX_HTTP_LUA_HAVE_MMAP_SBRK)                                            \
+    && (NGX_LINUX)                                                           \
+    && !(NGX_HTTP_LUA_HAVE_CONSTRUCTOR)
     ngx_http_lua_pre_config,          /*  preconfiguration */
 #else
     NULL,                             /*  preconfiguration */
@@ -678,7 +681,6 @@ ngx_http_lua_init(ngx_conf_t *cf)
     }
 
 #ifndef NGX_LUA_NO_FFI_API
-
     /* add the cleanup of semaphores after the lua_close */
     cln = ngx_pool_cleanup_add(cf->pool, 0);
     if (cln == NULL) {
@@ -686,8 +688,7 @@ ngx_http_lua_init(ngx_conf_t *cf)
     }
 
     cln->data = lmcf;
-    cln->handler = ngx_http_lua_cleanup_semaphore_mm;
-
+    cln->handler = ngx_http_lua_sema_mm_cleanup;
 #endif
 
     if (lmcf->lua == NULL) {
@@ -758,8 +759,11 @@ ngx_http_lua_lowat_check(ngx_conf_t *cf, void *post, void *data)
 static void *
 ngx_http_lua_create_main_conf(ngx_conf_t *cf)
 {
+#ifndef NGX_LUA_NO_FFI_API
+    ngx_int_t       rc;
+#endif
+
     ngx_http_lua_main_conf_t    *lmcf;
-    ngx_http_lua_semaphore_mm_t *mm;
 
     lmcf = ngx_pcalloc(cf->pool, sizeof(ngx_http_lua_main_conf_t));
     if (lmcf == NULL) {
@@ -798,25 +802,14 @@ ngx_http_lua_create_main_conf(ngx_conf_t *cf)
     lmcf->postponed_to_rewrite_phase_end = NGX_CONF_UNSET;
     lmcf->postponed_to_access_phase_end = NGX_CONF_UNSET;
 
-    mm = ngx_palloc(cf->pool, sizeof(ngx_http_lua_semaphore_mm_t));
-    if (mm == NULL) {
+#ifndef NGX_LUA_NO_FFI_API
+    rc = ngx_http_lua_sema_mm_init(cf, lmcf);
+    if (rc != NGX_OK) {
         return NULL;
     }
 
-    lmcf->semaphore_mm = mm;
-    mm->lmcf = lmcf;
-
-    ngx_queue_init(&mm->free_queue);
-    mm->cur_epoch = 0;
-    mm->total = 0;
-    mm->used = 0;
-
-    /* it's better to be 4096, but it needs some space for
-     * ngx_http_lua_semaphore_mm_block_t, one is enough, so it is 4095
-     */
-    mm->num_per_block = 4095;
-
     dd("nginx Lua module main config structure initialized!");
+#endif
 
     return lmcf;
 }
@@ -887,6 +880,7 @@ ngx_http_lua_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
     if (conf->ssl.cert_src.len == 0) {
         conf->ssl.cert_src = prev->ssl.cert_src;
+        conf->ssl.cert_src_key = prev->ssl.cert_src_key;
         conf->ssl.cert_handler = prev->ssl.cert_handler;
     }
 
@@ -1170,7 +1164,9 @@ ngx_http_lua_set_ssl(ngx_conf_t *cf, ngx_http_lua_loc_conf_t *llcf)
 #endif  /* NGX_HTTP_SSL */
 
 
-#if (NGX_HTTP_LUA_HAVE_MMAP_SBRK) && !(NGX_HTTP_LUA_HAVE_CONSTRUCTOR)
+#if (NGX_HTTP_LUA_HAVE_MMAP_SBRK)                                            \
+    && (NGX_LINUX)                                                           \
+    && !(NGX_HTTP_LUA_HAVE_CONSTRUCTOR)
 static ngx_int_t
 ngx_http_lua_pre_config(ngx_conf_t *cf)
 {
@@ -1184,7 +1180,7 @@ ngx_http_lua_pre_config(ngx_conf_t *cf)
  * we simply assume that LuaJIT is used. it does little harm when the
  * standard Lua 5.1 interpreter is used instead.
  */
-#if (NGX_HTTP_LUA_HAVE_MMAP_SBRK)
+#if (NGX_HTTP_LUA_HAVE_MMAP_SBRK) && (NGX_LINUX)
 #   if (NGX_HTTP_LUA_HAVE_CONSTRUCTOR)
 __attribute__((constructor))
 #   endif
