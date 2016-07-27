@@ -358,7 +358,7 @@ ngx_http_lua_body_filter_param_get(lua_State *L)
 
     dd("index: %d", idx);
 
-    if (idx != 1 && idx != 2) {
+    if (idx != 1 && idx != 2 && idx != 3) {
         lua_pushnil(L);
         return 1;
     }
@@ -386,7 +386,10 @@ ngx_http_lua_body_filter_param_get(lua_State *L)
 
     if (in == NULL) {
         /* being a cleared chain on the Lua land */
-        lua_pushliteral(L, "");
+	if (idx == 1)
+            lua_pushliteral(L, "");
+	else
+	    lua_pushnumber(L, 0);
         return 1;
     }
 
@@ -395,7 +398,12 @@ ngx_http_lua_body_filter_param_get(lua_State *L)
         dd("seen only single buffer");
 
         b = in->buf;
-        lua_pushlstring(L, (char *) b->pos, b->last - b->pos);
+	if (idx == 1) {
+            lua_pushlstring(L, (char *) b->pos, b->last - b->pos);
+	}
+	else {
+	    lua_pushnumber(L, b->last - b->pos);
+	}
         return 1;
     }
 
@@ -409,6 +417,11 @@ ngx_http_lua_body_filter_param_get(lua_State *L)
         if (b->last_buf || b->last_in_chain) {
             break;
         }
+    }
+
+    if (idx == 3) {
+	lua_pushnumber(L, size);
+	return 1;
     }
 
     data = (u_char *) lua_newuserdata(L, size);
