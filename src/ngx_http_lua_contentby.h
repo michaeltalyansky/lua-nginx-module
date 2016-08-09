@@ -20,6 +20,7 @@ ngx_int_t ngx_http_lua_content_handler(ngx_http_request_t *r);
 ngx_int_t ngx_http_lua_content_run_posted_threads(lua_State *L,
     ngx_http_request_t *r, ngx_http_lua_ctx_t *ctx, int n);
 
+void ngx_http_lua_content_inject_content_api(ngx_log_t *log, lua_State *L);
 
 #endif /* _NGX_HTTP_LUA_CONTENT_BY_H_INCLUDED_ */
 

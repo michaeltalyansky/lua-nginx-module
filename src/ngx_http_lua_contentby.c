@@ -20,6 +20,14 @@
 
 static void ngx_http_lua_content_phase_post_read(ngx_http_request_t *r);
 
+static int ngx_http_lua_content_by_file(lua_State *L);
+
+void
+ngx_http_lua_content_inject_content_api(ngx_log_t *log, lua_State *L)
+{
+    lua_pushcfunction(L, ngx_http_lua_content_by_file);
+    lua_setfield(L, -2, "content_by_file");
+}
 
 ngx_int_t
 ngx_http_lua_content_by_chunk(lua_State *L, ngx_http_request_t *r)
@@ -242,6 +250,44 @@ ngx_http_lua_content_phase_post_read(ngx_http_request_t *r)
     }
 }
 
+
+static int
+ngx_http_lua_content_by_file(lua_State *L)
+{
+    ngx_http_lua_loc_conf_t         *llcf;
+    ngx_http_request_t          *r;
+    ngx_int_t                        rc;
+
+    r = ngx_http_lua_get_req(L);
+
+    llcf = ngx_http_get_module_loc_conf(r, ngx_http_lua_module);
+
+    int n = lua_gettop(L);
+    if (n != 1)
+        return luaL_error(L, "ngx_http_lua_content_by_file: expected 1 parameter, got %d", n);
+
+    if (!lua_isstring(L, 1))
+        return luaL_error(L, "ngx_http_lua_content_by_file: wrong type of parameter 1");
+    const u_char *script_path = (const u_char *)lua_tostring (L, 1);
+    ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
+        "ngx_http_lua_content_by_file: script path (%s)", script_path);
+
+    
+    /*  load Lua script file (w/ cache)        sp = 1 */
+    rc = ngx_http_lua_cache_loadfile(r->connection->log, L, script_path,
+                                     llcf->content_src_key);
+    if (rc != NGX_OK) {
+	return luaL_error(L, "ngx_http_lua_content_by_file: error %d in loadfile", rc);
+    }
+
+    /*  make sure we have a valid code chunk */
+    ngx_http_lua_assert(lua_isfunction(L, -1));
+
+    rc = ngx_http_lua_content_by_chunk(L, r);
+
+    lua_pushnumber(L, rc);
+    return 1;
+}
 
 ngx_int_t
 ngx_http_lua_content_handler_file(ngx_http_request_t *r)

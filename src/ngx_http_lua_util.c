@@ -756,6 +756,8 @@ ngx_http_lua_inject_ngx_api(lua_State *L, ngx_http_lua_main_conf_t *lmcf,
 
     ngx_http_lua_inject_misc_api(L);
 
+    ngx_http_lua_content_inject_content_api(log, L);
+
     lua_getglobal(L, "package"); /* ngx package */
     lua_getfield(L, -1, "loaded"); /* ngx package loaded */
     lua_pushvalue(L, -3); /* ngx package loaded ngx */
