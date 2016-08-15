@@ -263,8 +263,8 @@ ngx_http_lua_content_by_file(lua_State *L)
     llcf = ngx_http_get_module_loc_conf(r, ngx_http_lua_module);
 
     int n = lua_gettop(L);
-    if (n != 1)
-        return luaL_error(L, "ngx_http_lua_content_by_file: expected 1 parameter, got %d", n);
+    if (n < 1)
+        return luaL_error(L, "ngx_http_lua_content_by_file: expected at least 1 parameter, got %d", n);
 
     if (!lua_isstring(L, 1))
         return luaL_error(L, "ngx_http_lua_content_by_file: wrong type of parameter 1");
@@ -272,6 +272,28 @@ ngx_http_lua_content_by_file(lua_State *L)
     ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
         "ngx_http_lua_content_by_file: script path (%s)", script_path);
 
+    if (n >= 2) {
+	lua_createtable(L, n-1, 0);
+	int i;
+	for (i = 1; i < n; i++) {
+	    lua_pushnumber(L, i);
+	    switch(lua_type(L, i+1)){
+		case LUA_TBOOLEAN:
+		    lua_pushboolean(L, lua_toboolean(L, i+1));
+		    break;
+		case LUA_TNUMBER:
+		    lua_pushnumber(L, lua_tonumber(L, i+1));
+		    break;
+		case LUA_TSTRING:
+		    lua_pushstring(L, lua_tostring(L, i+1));
+		    break;
+		default:
+		    return luaL_error(L, "ngx_http_lua_content_by_file: cannot handle tables as parameters");
+	    }
+	    lua_settable(L, -3);
+	}
+	lua_setglobal(L, "arg");
+    }
     
     /*  load Lua script file (w/ cache)        sp = 1 */
     rc = ngx_http_lua_cache_loadfile(r->connection->log, L, script_path,
