@@ -21,6 +21,7 @@
 static int ngx_http_lua_socket_tcp(lua_State *L);
 static int ngx_http_lua_socket_tcp_connect(lua_State *L);
 static int ngx_http_lua_dscp(lua_State *L);
+static int ngx_http_lua_proxy_buffering(lua_State *L);
 #if (NGX_HTTP_SSL)
 static int ngx_http_lua_socket_tcp_sslhandshake(lua_State *L);
 #endif
@@ -200,6 +201,9 @@ ngx_http_lua_inject_socket_tcp_api(ngx_log_t *log, lua_State *L)
 
     lua_pushcfunction(L, ngx_http_lua_dscp);
     lua_setfield(L, -2, "dscp");
+
+    lua_pushcfunction(L, ngx_http_lua_proxy_buffering);
+    lua_setfield(L, -2, "proxy_buffering");
 
     lua_createtable(L, 0, 4 /* nrec */);    /* ngx.socket */
 
@@ -430,6 +434,39 @@ ngx_http_lua_dscp(lua_State *L)
     if (setsockopt(r->connection->fd, IPPROTO_IP, IP_TOS,
                    (const void *) &val, sizeof(val)) == -1)
 	return luaL_error(L, "ngx.dscp: error %d in setsockopt IP_TOS", errno);
+
+    lua_pushnumber(L, 1);
+    return 1;
+}
+
+#include "ngx_http.h"
+#include "ngx_http_upstream.h"
+
+static int
+ngx_http_lua_proxy_buffering(lua_State *L)
+{
+    ngx_http_request_t          *r;
+    ngx_http_upstream_t *u;
+
+    r = ngx_http_lua_get_req(L);
+    if (!r->connection)
+	return luaL_error(L, "ngx.proxy_buffering: connection is null");
+    
+    int n = lua_gettop(L);
+    if (n != 1)
+	return luaL_error(L, "ngx.proxy_buffering: expected 1 parameter, got %d", n);
+
+    if (!lua_isstring(L, 1))
+	return luaL_error(L, "ngx.proxy_buffering: wrong type of parameter 1");
+    const char *valstr = lua_tostring (L, 1);
+    int on = strcasecmp(valstr, "on") ? 0 : 1;
+
+    ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
+        "proxy_buffering value (%s)->%d", valstr, on);
+    
+    u = r->upstream;
+
+    u->buffering = on;
 
     lua_pushnumber(L, 1);
     return 1;
