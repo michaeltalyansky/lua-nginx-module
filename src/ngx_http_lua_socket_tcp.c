@@ -465,8 +465,10 @@ ngx_http_lua_proxy_buffering(lua_State *L)
         "proxy_buffering value (%s)->%d", valstr, on);
     
     u = r->upstream;
-
-    u->buffering = on;
+    if (u)
+        u->buffering = on;
+    else
+	return luaL_error(L, "ngx.proxy_buffering: request's upstream pointer is nil");
 
     lua_pushnumber(L, 1);
     return 1;
