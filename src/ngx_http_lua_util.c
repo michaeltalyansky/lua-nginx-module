@@ -51,6 +51,7 @@
 #include "ngx_http_lua_socket_tcp.h"
 #include "ngx_http_lua_ssl_certby.h"
 
+#include "lngx_radix_tree.h"
 
 #if 1
 #undef ngx_http_lua_probe_info
@@ -757,6 +758,8 @@ ngx_http_lua_inject_ngx_api(lua_State *L, ngx_http_lua_main_conf_t *lmcf,
     ngx_http_lua_inject_misc_api(L);
 
     ngx_http_lua_content_inject_content_api(log, L);
+
+    ngx_http_lua_inject_radix_api(log, L);
 
     lua_getglobal(L, "package"); /* ngx package */
     lua_getfield(L, -1, "loaded"); /* ngx package loaded */
