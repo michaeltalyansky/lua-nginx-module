@@ -98,8 +98,8 @@ static int ngx_lua_radix_addrecord(lua_State *L)
 
 static int ngx_lua_radix_findaddr(lua_State *L)
 {
-    std::string addr_str;
     lngx_radix_tree_t *p;
+    int rc;
 
     int n = lua_gettop(L);
     if (n != 2)
@@ -109,19 +109,24 @@ static int ngx_lua_radix_findaddr(lua_State *L)
 	 return luaL_error(L, "ngx.radix_findaddr: wrong type of parameter 1");
     p = (lngx_radix_tree_t *)lua_touserdata(L, 1);
 
-    if (!lua_isstring(L, 2))
-	return luaL_error(L, "ngx.radix_findaddr: wrong type of parameter 2");
+    if (lua_isstring(L, 2)) { // string format
+        std::string addr_str(lua_tostring (L, 2));
 
-    addr_str.assign(lua_tostring (L, 2));
-
-    // v4
-    struct in_addr addr;
-    int rc = inet_pton(AF_INET, addr_str.c_str(), &addr);
-    if (1 == rc) {
-	rc = lngx_radix32tree_find(p, ntohl(addr.s_addr));
+        // v4
+        struct in_addr addr;
+        rc = inet_pton(AF_INET, addr_str.c_str(), &addr);
+        if (1 == rc) {
+	    rc = lngx_radix32tree_find(p, ntohl(addr.s_addr));
+        }
+        else
+	    return luaL_error(L, "ngx.radix_findaddr: bad v4 address (%s)", addr_str.c_str());
+    }
+    else if (lua_isnumber(L, 2)) { // binary address
+        unsigned int addr = lua_tonumber (L, 2);
+	rc = lngx_radix32tree_find(p, ntohl(addr));
     }
     else
-	return luaL_error(L, "ngx.radix_addrecord: bad v4 address (%s)", addr_str.c_str());
+	return luaL_error(L, "ngx.radix_findaddr: wrong type of parameter 2");
 
     lua_pushnumber(L, rc);
     return 1;
@@ -129,7 +134,7 @@ static int ngx_lua_radix_findaddr(lua_State *L)
 
 static lngx_radix_node_t *lngx_radix_alloc(lngx_radix_tree_t *tree);
 
-int lngx_pagesize = 0;
+static int lngx_pagesize = 0;
 
 lngx_radix_tree_t *
 lngx_radix_tree_create(lua_Alloc a, void *ud, lngx_int_t preallocate)

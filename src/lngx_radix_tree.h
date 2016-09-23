@@ -18,14 +18,6 @@
 typedef int lngx_int_t;
 typedef unsigned int lngx_uint_t;
 
-#define  NGX_OK          0
-#define  NGX_ERROR      -1
-#define  NGX_AGAIN      -2
-#define  NGX_BUSY       -3
-#define  NGX_DONE       -4
-#define  NGX_DECLINED   -5
-#define  NGX_ABORT      -6
-
 #define NGX_RADIX_NO_VALUE   (uintptr_t) -1
 
 #ifdef __cplusplus
@@ -42,12 +34,6 @@ static inline void *lngx_pmemalign(lua_Alloc a, void *ud, int size, int ALIGN) {
     ptr[-1] = mem;
     return ptr;
 }
-
-#if 0
-static inline void aligned_free(void *ptr) {
-    free(((void**)ptr)[-1]);
-}
-#endif
 
 static inline void *lngx_palloc(lua_Alloc a, void *ud, size_t size)
 {
@@ -70,8 +56,6 @@ typedef struct {
     size_t             size;
 } lngx_radix_tree_t;
 
-
-extern int lngx_pagesize;
 
 lngx_radix_tree_t *lngx_radix_tree_create(lua_Alloc a, void *ud, 
     lngx_int_t preallocate);
