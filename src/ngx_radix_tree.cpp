@@ -58,7 +58,7 @@ static int ngx_lua_radix_addrecord(lua_State *L)
 	 return luaL_error(L, "ngx.radix_addrecord: wrong type of parameter 1");
     p = (lngx_radix_tree_t *)lua_touserdata(L, 1);
 
-    if (!lua_isstring(L, 2))
+    if (lua_type(L, 2) != LUA_TSTRING)
 	return luaL_error(L, "ngx.radix_addrecord: wrong type of parameter 2");
 
     addr_str.assign(lua_tostring (L, 2));
@@ -109,7 +109,9 @@ static int ngx_lua_radix_findaddr(lua_State *L)
 	 return luaL_error(L, "ngx.radix_findaddr: wrong type of parameter 1");
     p = (lngx_radix_tree_t *)lua_touserdata(L, 1);
 
-    if (lua_isstring(L, 2)) { // string format
+    int val_type = lua_type(L, 2);
+
+    if (val_type == LUA_TSTRING) { // string format
         std::string addr_str(lua_tostring (L, 2));
 
         // v4
@@ -121,7 +123,7 @@ static int ngx_lua_radix_findaddr(lua_State *L)
         else
 	    return luaL_error(L, "ngx.radix_findaddr: bad v4 address (%s)", addr_str.c_str());
     }
-    else if (lua_isnumber(L, 2)) { // binary address
+    else if (val_type == LUA_TNUMBER) { // binary address
         unsigned int addr = lua_tonumber (L, 2);
 	rc = lngx_radix32tree_find(p, ntohl(addr));
     }
